@@ -1,33 +1,41 @@
-! 一维欧拉方程激波管数值解 (2016-04-13)
-!  ----by Chen Chen 
+! 一维欧拉方程数值解 (2016-04-22)  --by Chen Chen 
+! 激波管问题&激波-密度扰动波干扰问题求解程序
 ! Scheme：5阶WENO，2阶GVC
 ! FVS：Steger-Warming
 
  PROGRAM RiemanNumeriComput
  IMPLICIT NONE
  
- INTEGER i, j, k, iterN, points, scheme                      
- REAL(8) dt, dx, time, t, length, time_end, time_step, n
- REAL(8) UL, DL, PL, UR, DR, PR
+ INTEGER i, j, k, iterN, points, scheme, prob
+ REAL(8) dt, dx, time, t, length, time_end, time_step, n, x1, x2
+ REAL(8) UL, DL, PL, UR, DR, PR, u1, d1, p1, u2, p2
  REAL(8),ALLOCATABLE,DIMENSION(:,:) ::  Fd, U, Q           ! U (D,DU,E), Q (D,U,P)
 
- COMMON /G1/ dt, dx, t
+ COMMON /G1/ dt, dx, t, x1
  COMMON /G2/ points, scheme
  COMMON /G3/ UL, DL, PL, UR, DR, PR
- 
-! 初始条件 与 计算条件
- UL     = 0.0      ;  DL     = 1.0     ;  PL     = 1.0
- UR     = 0.0      ;  DR     = 0.125   ;  PR     = 0.1
- time   = 0.14     ;  length = 1.0     ;  points = 5000
- dt     = 0.0001  ;  scheme = 2                           ! 1 = GVC2, 2 = WENO5
- dx     = length / points
- iterN  = time / dt
+ COMMON /G4/ u1, d1, p1, u2, p2
+
+
+!===================激波管初始条件================
+ UL = 0.0   ;  DL = 1.0    ;  PL = 1.0
+ UR = 0.0   ;  DR = 0.125  ;  PR = 0.1
+!============激波-密度扰动波干扰初始条件=========
+ u1 = 2.629 ;  d1 = 3.857  ;  p1 = 10.333
+ u2 = 0.0   ;  p2 = 1.0
+!======================计算条件===================
+ time    = 0.20  ;  x1     = 0.0      ;  x2 = 1.0
+ points  = 2000  ;  dt     = 0.000005
+ prob    = 1     ;  scheme = 2                     ! prob1 = sod   prob2 = homework 5-2   scheme1 = GVC2   scheme2 = WENO5
+ length  = x2 - x1
+ dx      = length / points
+ iterN   = time / dt
 
  ALLOCATE(Fd(points,3))
  ALLOCATE(Q(points,3))
  ALLOCATE(U(points,3))
 
- CALL MESH_GENERATION()         ! 生成网格
+ CALL MESH_GENERATION(prob)     ! 生成网格     
  CALL READ_MESH(Q)              ! 读网格
  CALL CONSER_VARI_GET(Q, U)     ! 计算守恒变量
  
@@ -36,14 +44,13 @@
  DO i = 1, iterN
   CALL STEG_WARM(U, Fd)         ! Steger-Warming
   CALL RK_THREE(U, Fd)          ! 3阶Runge-Kutta
-  !CALL EULER(U,Fd)             ! 1阶Euler
   t = t + dt
 
  CALL CPU_TIME(time_step)
 
  n = (t/time)*100.0
- !WRITE(*,'(A25, F5.2, A2, A18,F8.5,A13,F6.2,A4)')'Calculation Progress : ',n,'%', '   At Time Step =', t, &
- !                                                '   CPU Time = ',time_step,'sec'
+ WRITE(*,'(A25, F5.2, A2, A18,F8.5,A13,F6.2,A4)')'Calculation Progress : ',n,'%', '   At Time Step =', t, &
+                                                '   CPU Time = ',time_step,'sec'
  END DO
 
  CALL OUTPUT(Q, U)              ! 输出文件
@@ -51,26 +58,6 @@
  WRITE(*,'(A19,F6.2,A4)') 'Total CPU time =', time_end, 'sec'
 
  END
-
-!================1阶Euler=================
- SUBROUTINE EULER(u,fd)
- IMPLICIT NONE
- REAL(8) :: u(points,3), fd(points,3)
- REAL(8) dt, dx, t
- INTEGER i, j, points, scheme
-
- COMMON /G1/ dt, dx, t
- COMMON /G2/ points, scheme
-
- DO i = 1, points
-  DO j = 1, 3
-   u(i,j) = u(i,j) + dt * (-fd(i,j))
-  END DO
- END DO
-
- RETURN
-
- END SUBROUTINE EULER
 
 
 ! ==============================Steger-Warming分裂==========================
@@ -83,9 +70,9 @@
  IMPLICIT NONE
  REAL(8),ALLOCATABLE,DIMENSION(:,:) :: Q, F1, F2, F1d, F2d
  REAL(8) :: LAMBDA(3), LAMBDA_P(3), LAMBDA_M(3)
- REAL(8) a, dt, dx, t, P1, P2, P3, WP, M1, M2, M3, WM    ! 通量分裂中第三个分量的计算系数，见课件p37
+ REAL(8) a, dt, dx, x1, t, P1, P2, P3, WP, M1, M2, M3, WM    ! 通量分裂中第三个分量的计算系数，见课件p37
  INTEGER DIREC, i, j, points, scheme, k
- COMMON /G1/ dt, dx, t
+ COMMON /G1/ dt, dx, t, x1
  COMMON /G2/ points, scheme
  REAL(8) :: U(points,3), Fd(points,3)
 
@@ -146,6 +133,7 @@
     CALL WENO5(DIREC, F2(:,i), F2d(:,i))
   END IF
    Fd(:,i) = F1d(:,i) + F2d(:,i)   ! 合并
+!   WRITE(*,*)Fd(:,1) ; STOP
  END DO
 
  RETURN
@@ -161,10 +149,10 @@
 
  SUBROUTINE GVC2(DIREC, Fk, Fkd)
  IMPLICIT NONE
- REAL(8) JUDGE, dx, dt, t, F2, F1  ! F2 = Fj + 0.5, F1 = Fj - 0.5
+ REAL(8) JUDGE, dx, dt, t, x1, F2, F1  ! F2 = Fj + 0.5, F1 = Fj - 0.5
  INTEGER DIREC, points, scheme, i
  COMMON /G2/ points, scheme
- COMMON /G1/ dt, dx, t
+ COMMON /G1/ dt, dx, t, x1
 
  REAL(8) :: Fk(points), Fkd(points)
  
@@ -214,104 +202,134 @@
 ! ====================================================================
  SUBROUTINE WENO5(DIREC, Fk, Fkd)
  IMPLICIT NONE
- REAL(8) dx, dt, t, M1, M2, M3      ! F21, F22, F23是 F2 = Fj + 1/2 的三个因子
- REAL(8) IS1, IS2, IS3, a1, a2, a3, a
+ REAL(8) dx, dt, t, w1(points+1), w2(points+1), w3(points+1)
+ REAL(8) IS1, IS2, IS3, a1, a2, a3, a, x1
  INTEGER DIREC, points, scheme, i
 
  COMMON /G2/ points, scheme
- COMMON /G1/ dt, dx, t
+ COMMON /G1/ dt, dx, t, x1
  
- REAL(8) :: Fk(points), Fkd(points), F(points+5), w1(points), w2(points), w3(points)
- REAL(8) :: Fk1(points), Fk2(points), Fk3(points)
+ REAL(8) :: Fk(points), Fkd(points), F(points+5)
+ REAL(8) :: Fk1(points), Fk2(points), Fk3(points), Fj(points+1)
+
+ Fj = 0.0
 
  SELECT CASE(DIREC)
  CASE (1) ! 正通量
-  ! 为防止计算时用到边界外的点发生数组溢出，此处构造实际计算数组F，左侧3个虚网格，右侧2个虚网格
+  ! 构造实际计算数组F，左侧3个虚网格，右侧2个虚网格
   F(1) = 0.0 ; F(2) = 0.0 ; F(3) = 0.0 ; F(points+4) = 0.0 ; F(points+5) = 0.0
 
   DO i = 1, points
    F(i+3) = Fk(i)
   END DO
 
-  DO i = 1, points
-   IS1   = 0.25 * ( F(i+1) - 4.0 * F(i+2) + 3.0 * F(i+3) )**2.0 + (13.0/12.0) * ( F(i+1) - 2.0 * F(i+2) + F(i+3) )**2.0
-   IS2   = 0.25 * ( F(i+2) - F(i+4) )**2.0 + (13.0/12.0) * ( F(i+2) - 2.0 * F(i+3) + F(i+4) )**2.0
-   IS3   = 0.25 * ( 3.0 * F(i+3) - 4.0 * F(i+4) + F(i+5) )**2.0 + (13.0/12.0) * ( F(i+3) - 2.0 * F(i+4) + F(i+5) )**2.0
-   a1    = 0.1 / ( ( 0.000001 + IS1 )**2.0 )
-   a2    = 0.6 / ( ( 0.000001 + IS2 )**2.0 )
-   a3    = 0.3 / ( ( 0.000001 + IS3 )**2.0 )
-   a     = a1 + a2 + a3
-   w1(i) = a1 / a ; w2(i)  = a2 / a ; w3(i)  = a3 / a
+  DO i = 1, (points+1)
+   Fk1(i) = (1.0/3.0) * F(i) - (7.0/6.0) * F(i+1) + (11.0/6.0) * F(i+2)
+   Fk2(i) = (-1.0/6.0) * F(i+1) + (5.0/6.0) * F(i+2) + (1.0/3.0) * F(i+3)
+   Fk3(i) = (1.0/3.0) * F(i+2) + (5.0/6.0) * F(i+3) - (1.0/6.0) * F(i+4)
+   IS1    = 0.25 * ( F(i) - 4.0 * F(i+1) + 3.0 * F(i+2) )**2.0 + (13.0/12.0) * ( F(i) - 2.0 * F(i+1) + F(i+2) )**2.0
+   IS2    = 0.25 * ( F(i+1) - F(i+3) )**2.0 + (13.0/12.0) * ( F(i+1) - 2.0 * F(i+2) + F(i+3) )**2.0
+   IS3    = 0.25 * ( 3.0 * F(i+2) - 4.0 * F(i+3) + F(i+4) )**2.0 + (13.0/12.0) * ( F(i+2) - 2.0 * F(i+3) + F(i+4) )**2.0
+   a1     = 0.1 / ( ( 0.000001 + IS1 )**2.0 )
+   a2     = 0.6 / ( ( 0.000001 + IS2 )**2.0 )
+   a3     = 0.3 / ( ( 0.000001 + IS3 )**2.0 )
+   a      = a1 + a2 + a3
+   w1(i)  = a1 / a ; w2(i) = a2 / a ; w3(i) = a3 / a
   END DO
-  
+
+  DO i = 4, (points-1)
+   Fj(i)  = w1(i) * Fk1(i) + w2(i) * Fk2(i) + w3(i) * Fk3(i)
+  END DO
+
+  DO i = 4, (points-2)
+   Fkd(i)  = ( Fj(i+1) - Fj(i) )  / dx
+  END DO
+
   ! 边界处理
-  w1(1) = 0.0 ; w2(1) = 0.0 ; w3(1) = 0.0    ! j = 1
-  w1(2) = 0.0 ; w2(2) = 0.0                  ! j = 2
-  w1(3) = 0.0                                ! j = 3
-  w2(points) = 0.0 ; w3(points) = 0.0        ! j = points
-  w3(points-1) = 0.0                         ! j = points-1
+  ! j = 1            ! j = 2 
+  Fkd(1) = 0.0 ;     Fkd(2) = ( Fk3(3) - Fk3(2) ) / dx
 
-  DO i = 1, points
-   Fk1(i)  = (1.0/3.0) * F(i+1) - (7.0/6.0) * F(i+2) + (11.0/6.0) * F(i+3)
-   Fk2(i)  = (-1.0/6.0) * F(i+2) + (5.0/6.0) * F(i+3) + (1.0/3.0) * F(i+4)
-   Fk3(i)  = (1.0/3.0) * F(i+3) + (5.0/6.0) * F(i+4) - (1.0/6.0) * F(i+5)
-   Fk(i)   = w1(i) * Fk1(i) + w2(i) * Fk2(i) + w3(i) * Fk3(i)
+  ! j = 3
+  DO i = 3, 4
+   IS2 = 0.25 * ( F(i+1) - F(i+3) )**2.0 + (13.0/12.0) * ( F(i+1) - 2.0 * F(i+2) + F(i+3) )**2.0
+   IS3 = 0.25 * ( 3.0 * F(i+2) - 4.0 * F(i+3) + F(i+4) )**2.0 + (13.0/12.0) * ( F(i+2) - 2.0 * F(i+3) + F(i+4) )**2.0
+   a2  = 0.6 / ( ( 0.000001 + IS2 )**2.0 )
+   a3  = 0.3 / ( ( 0.000001 + IS3 )**2.0 )
+   a   = a2 + a3
+   w2(i) = a2 / a ; w3(i) = a3 / a
   END DO
-   
-   M1 = w1(1) * ( (1.0/3.0) * F(1) - (7.0/6.0) * F(2) + (11.0/6.0) * F(3) )
-   M2 = w2(1) * ( (-1.0/6.0) * F(2) + (5.0/6.0) * F(3) + (1.0/3.0) * F(4) )
-   M3 = w3(1)* ( (1.0/3.0) * F(3) + (5.0/6.0) * F(4) - (1.0/6.0) * F(5) )
-   
-  Fkd(1)  = ( Fk(1) - ( M1 + M2 + M3 ) ) / dx
+  Fkd(3) = ( w2(4)*Fk2(4) + w3(4)*Fk3(4) - w2(3)*Fk2(3) - w3(3)*Fk3(3) ) / dx
 
-  DO i = 2, points
-   M2 = w1(i) * Fk1(i) + w2(i) * Fk2(i) + w3(i) * Fk3(i)
-   M1 = w1(i) * Fk1(i-1) + w2(i) * Fk2(i-1) + w3(i) * Fk3(i-1) 
-   Fkd(i)  = ( M2 - M1 )  / dx
+  ! j = points-1
+  DO i = (points-1), points
+   IS1    = 0.25 * ( F(i) - 4.0 * F(i+1) + 3.0 * F(i+2) )**2.0 + (13.0/12.0) * ( F(i) - 2.0 * F(i+1) + F(i+2) )**2.0
+   IS2    = 0.25 * ( F(i+1) - F(i+3) )**2.0 + (13.0/12.0) * ( F(i+1) - 2.0 * F(i+2) + F(i+3) )**2.0
+   a1  = 0.6 / ( ( 0.000001 + IS1 )**2.0 )
+   a2  = 0.3 / ( ( 0.000001 + IS2 )**2.0 )
+   a   = a1 + a2
+   w1(i) = a1 / a ; w2(i) = a2 / a
   END DO
- 
+  Fkd(points-1) = (w1(points)*Fk1(points)+w2(points)*Fk2(points)-w1(points-1)*Fk1(points-1)-w2(points-1)*Fk2(points-1))/dx
+
+  ! j = points
+  Fkd(points) = ( Fk1(points+1) - Fk1(points) ) / dx
+
  CASE (2) ! 负通量
   F(1) = 0.0 ; F(2) = 0.0 ; F(points+3) = 0.0 ; F(points+4) = 0.0 ; F(points+5) = 0.0
   DO i = 1, points
    F(i+2) = Fk(i)
   END DO
 
-  DO i = 1, points                
-   IS1   = 0.25 * ( F(i+4) - 4.0 * F(i+3) + 3.0 * F(i+2) )**2.0 + (13.0/12.0) * ( F(i+4) - 2.0 * F(i+3) + F(i+2) )**2.0
-   IS2   = 0.25 * ( F(i+3) - F(i+1) )**2.0 + (13.0/12.0) * ( F(i+3) - 2.0 * F(i+2) + F(i+1) )**2.0
-   IS3   = 0.25 * ( 3.0 * F(i+2) - 4.0 * F(i+1) + F(i) )**2.0 + (13.0/12.0) * ( F(i+2) - 2.0 * F(i+1) + F(i) )**2.0
-   a1    = 0.1 / ( ( 0.000001 + IS1 )**2.0 )
-   a2    = 0.6 / ( ( 0.000001 + IS2 )**2.0 )
-   a3    = 0.3 / ( ( 0.000001 + IS3 )**2.0 )
-   a     = a1 + a2 + a3
-   w1(i) = a1 / a ; w2(i)  = a2 / a ; w3(i)  = a3 / a
+  DO i = 1, points+1
+   Fk1(i) = (1.0/3.0) * F(i+4) - (7.0/6.0) * F(i+3) + (11.0/6.0) * F(i+2)
+   Fk2(i) = (-1.0/6.0) * F(i+3) + (5.0/6.0) * F(i+2) + (1.0/3.0) * F(i+1)
+   Fk3(i) = (1.0/3.0) * F(i+2) + (5.0/6.0) * F(i+1) - (1.0/6.0) * F(i) 
+   IS1    = 0.25 * ( F(i+4) - 4.0 * F(i+3) + 3.0 * F(i+2) )**2.0 + (13.0/12.0) * ( F(i+4) - 2.0 * F(i+3) + F(i+2) )**2.0
+   IS2    = 0.25 * ( F(i+3) - F(i+1) )**2.0 + (13.0/12.0) * ( F(i+3) - 2.0 * F(i+2) + F(i+1) )**2.0
+   IS3    = 0.25 * ( 3.0 * F(i+2) - 4.0 * F(i+1) + F(i) )**2.0 + (13.0/12.0) * ( F(i+2) - 2.0 * F(i+1) + F(i) )**2.0
+   a1     = 0.1 / ( ( 0.000001 + IS1 )**2.0 )
+   a2     = 0.6 / ( ( 0.000001 + IS2 )**2.0 )
+   a3     = 0.3 / ( ( 0.000001 + IS3 )**2.0 )
+   a      = a1 + a2 + a3
+   w1(i)  = a1 / a ; w2(i) = a2 / a ; w3(i) = a3 / a
   END DO
-  
-  ! 边界处理
-  w2(1) = 0.0 ; w3(1) = 0.0                                  ! j = 1
-  w3(2) = 0.0                                                ! j = 2
-  w1(points) = 0.0 ; w2(points) = 0.0 ; w3(points) = 0.0     ! j = points
-  w1(points-1) = 0.0 ; w2(points-1) = 0.0                    ! j = points-1
-  w1(points-2) = 0.0                                         ! j = points-2
 
-  DO i = 1, points
-   Fk1(i)    = (1.0/3.0) * F(i+5) - (7.0/6.0) * F(i+4) + (11.0/6.0) * F(i+3)
-   Fk2(i)    = (-1.0/6.0) * F(i+4) + (5.0/6.0) * F(i+3) + (1.0/3.0) * F(i+2)
-   Fk3(i)    = (1.0/3.0) * F(i+3) + (5.0/6.0) * F(i+2) - (1.0/6.0) * F(i+1)
-   Fk(i)   = w1(i) * Fk1(i) + w2(i) * Fk2(i) + w3(i) * Fk3(i)
+  DO i = 3, (points-2)
+   Fj(i)  = w1(i) * Fk1(i) + w2(i) * Fk2(i) + w3(i) * Fk3(i)
   END DO
- 
-  M1 = w1(1) * ( (1.0/3.0) * F(5) - (7.0/6.0) * F(4) + (11.0/6.0) * F(3) )
-  M2 = w2(1) * ( (-1.0/6.0) * F(4) + (5.0/6.0) * F(3) + (1.0/3.0) * F(2) )
-  M3 = w3(1)* ( (1.0/3.0) * F(3) + (5.0/6.0) * F(2) - (1.0/6.0) * F(1) )
-   
-  Fkd(1)  = ( Fk(1) - ( M1 + M2 + M3 ) ) / dx
-  
-  DO i = 2, points
-   M2 = w1(i) * Fk1(i) + w2(i) * Fk2(i) + w3(i) * Fk3(i)
-   M1 = w1(i) * Fk1(i-1) + w2(i) * Fk2(i-1) + w3(i) * Fk3(i-1) 
-   Fkd(i)  = ( M2 - M1 )  / dx
+
+  DO i = 3, (points-3)
+   Fkd(i)  = ( Fj(i+1) - Fj(i) )  / dx
   END DO
+
+  ! 边界处理
+  ! j = 1
+  Fkd(1) = ( Fk1(2) - Fk1(1) ) / dx
+
+  ! j = 2
+  DO i = 2, 3
+   IS1    = 0.25 * ( F(i) - 4.0 * F(i+1) + 3.0 * F(i+2) )**2.0 + (13.0/12.0) * ( F(i) - 2.0 * F(i+1) + F(i+2) )**2.0
+   IS2    = 0.25 * ( F(i+1) - F(i+3) )**2.0 + (13.0/12.0) * ( F(i+1) - 2.0 * F(i+2) + F(i+3) )**2.0
+   a1  = 0.6 / ( ( 0.000001 + IS1 )**2.0 )
+   a2  = 0.3 / ( ( 0.000001 + IS2 )**2.0 )
+   a   = a1 + a2
+   w1(i) = a1 / a ; w2(i) = a2 / a
+  END DO
+  Fkd(2) = ( w1(3)*Fk1(3) + w2(3)*Fk2(3) - w1(2)*Fk1(2) - w2(2)*Fk2(2) ) / dx
+
+  ! j = points        ! j = points-1
+  Fkd(points) = 0.0 ; Fkd(points-1) = ( Fk3(points) - Fk3(points-1) ) / dx
+
+  ! j = points-2
+  DO i = (points-2), points-1
+   IS2 = 0.25 * ( F(i+1) - F(i+3) )**2.0 + (13.0/12.0) * ( F(i+1) - 2.0 * F(i+2) + F(i+3) )**2.0
+   IS3 = 0.25 * ( 3.0 * F(i+2) - 4.0 * F(i+3) + F(i+4) )**2.0 + (13.0/12.0) * ( F(i+2) - 2.0 * F(i+3) + F(i+4) )**2.0
+   a2  = 0.6 / ( ( 0.000001 + IS2 )**2.0 )
+   a3  = 0.3 / ( ( 0.000001 + IS3 )**2.0 )
+   a   = a2 + a3
+   w2(i) = a2 / a ; w3(i) = a3 / a
+  END DO
+  Fkd(points-2) = (w2(points-1)*Fk2(points-1)+w3(points-1)*Fk3(points-1)-w2(points-2)*Fk2(points-2)-w3(points-2)*Fk3(points-2))/dx
 
  END SELECT
 
@@ -327,10 +345,10 @@
  IMPLICIT NONE
  REAL(8),ALLOCATABLE,DIMENSION(:,:) :: u1, u2, u1d, u2d ,ud
  REAL(8) :: u(points,3), fd(points,3)
- REAL(8) dt, dx, t
+ REAL(8) dt, dx, t, x1
  INTEGER i, j, points, scheme
 
- COMMON /G1/ dt, dx, t
+ COMMON /G1/ dt, dx, t, x1
  COMMON /G2/ points, scheme
 
  ALLOCATE(ud(points,3))
@@ -369,30 +387,43 @@
 
 
 
-!=============生成初始网格==============
- SUBROUTINE MESH_GENERATION()
+!=============================生成初始网格==============================
+ SUBROUTINE MESH_GENERATION(prob)
  IMPLICIT NONE
- REAL(8) UL, DL, PL, UR, DR, PR, dt, dx
- INTEGER points, i, scheme
+ REAL(8) UL, DL, PL, UR, DR, PR, dt, dx, u1, d1, p1, u2, p2, x, x1, t
+ INTEGER points, i, scheme, prob
 
+ COMMON /G1/ dt, dx, t, x1
  COMMON /G3/ UL, DL, PL, UR, DR, PR
+ COMMON /G4/ u1, d1, p1, u2, p2
  COMMON /G2/ points, scheme
 
  OPEN(66,FILE='input.dat')
 
- DO i = 1, (points/2)
-  WRITE(66,*) DL, UL, PL
- END DO
- DO i = 1, (points/2)
-  WRITE(66,*) DR, UR, PR
- END DO
- 
+ SELECT CASE(prob)
+ CASE (1) ! 生成求解sod激波管初始网格
+  DO i = 1, (points/2)
+   WRITE(66,*) DL, UL, PL
+  END DO
+  DO i = 1, (points/2)
+   WRITE(66,*) DR, UR, PR
+  END DO
+ CASE (2) ! 生成求解激波-密度扰动波干扰问题的初始网格
+  DO i = 1, (points/10)
+   WRITE(66,*) d1, u1, p1
+  END DO
+  x = 0.0
+  DO i = 1, (points-points/10)
+   WRITE(66,*) 1 + 0.3*SIN(40.0*x), u2, p2
+   x = x + dx
+  END DO
+ END SELECT
+
  CLOSE(66)
 
  RETURN
 
  END SUBROUTINE MESH_GENERATION
-
 
 
 !==============读网格================
@@ -417,15 +448,17 @@
  SUBROUTINE OUTPUT(Q, U)
  IMPLICIT NONE
  INTEGER points, i, scheme
+ REAL(8) x, dx, t, dt, x1
  COMMON /G2/ points, scheme
  REAL(8) ::  Q(points,3), U(points,3)
-
+ COMMON /G1/ dt, dx, t, x1
  CALL PRIM_VARI_GET(Q, U)  ! 计算原始变量
 
  OPEN(44,FILE='output.dat')
- 
+ x = x1
  DO i = 1, points
-  WRITE(44,*) i, Q(i,:)
+  WRITE(44,*) x, Q(i,:)
+  x = x + dx
  END DO
 
  CLOSE(44)
@@ -467,6 +500,9 @@
 
  RETURN
  END SUBROUTINE PRIM_VARI_GET
+
+
+
 
 ! 编程总结：
 ! 1、所有模块统一思考 但最好是一个模块搞定并调试完后，再写另一个模块
