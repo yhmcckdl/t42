@@ -5,12 +5,10 @@
 
  PROGRAM RiemanNumeriComput
  IMPLICIT NONE
- 
  INTEGER i, j, k, iterN, points, scheme, prob
  REAL(8) dt, dx, time, t, length, time_end, time_step, n, x1, x2
  REAL(8) UL, DL, PL, UR, DR, PR, u1, d1, p1, u2, p2
  REAL(8),ALLOCATABLE,DIMENSION(:,:) ::  Fd, U, Q           ! U (D,DU,E), Q (D,U,P)
-
  COMMON /G1/ dt, dx, t, x1
  COMMON /G2/ points, scheme
  COMMON /G3/ UL, DL, PL, UR, DR, PR
@@ -24,9 +22,9 @@
  u1 = 2.629 ;  d1 = 3.857  ;  p1 = 10.333
  u2 = 0.0   ;  p2 = 1.0
 !======================计算条件===================
- time    = 0.20  ;  x1     = 0.0      ;  x2 = 1.0
- points  = 2000  ;  dt     = 0.000005
- prob    = 1     ;  scheme = 2                     ! prob1 = sod   prob2 = homework 5-2   scheme1 = GVC2   scheme2 = WENO5
+ time    = 0.10  ;  x1     = 0.0      ;  x2 = 1.0
+ points  = 200  ;  dt     = 0.000005
+ prob    = 2     ;  scheme = 2      ! scheme1 = GVC2   scheme2 = WENO5
  length  = x2 - x1
  dx      = length / points
  iterN   = time / dt
@@ -40,14 +38,11 @@
  CALL CONSER_VARI_GET(Q, U)     ! 计算守恒变量
  
  t = 0.0
- 
  DO i = 1, iterN
   CALL STEG_WARM(U, Fd)         ! Steger-Warming
   CALL RK_THREE(U, Fd)          ! 3阶Runge-Kutta
   t = t + dt
-
  CALL CPU_TIME(time_step)
-
  n = (t/time)*100.0
  WRITE(*,'(A25, F5.2, A2, A18,F8.5,A13,F6.2,A4)')'Calculation Progress : ',n,'%', '   At Time Step =', t, &
                                                 '   CPU Time = ',time_step,'sec'
@@ -58,7 +53,6 @@
  WRITE(*,'(A19,F6.2,A4)') 'Total CPU time =', time_end, 'sec'
 
  END
-
 
 ! ==============================Steger-Warming分裂==========================
 ! 功能：提供n时刻的守恒变量U矩阵，返回n时刻“U矩阵对应的”通量差分矩阵Fdj
@@ -75,13 +69,11 @@
  COMMON /G1/ dt, dx, t, x1
  COMMON /G2/ points, scheme
  REAL(8) :: U(points,3), Fd(points,3)
-
  ALLOCATE(F1(points,3))
  ALLOCATE(F2(points,3))
  ALLOCATE(F1d(points,3))
  ALLOCATE(F2d(points,3))
  ALLOCATE(Q(points,3))
-
 
 ! 此循环计算F1 F2
 ! ==================
@@ -153,14 +145,11 @@
  INTEGER DIREC, points, scheme, i
  COMMON /G2/ points, scheme
  COMMON /G1/ dt, dx, t, x1
-
  REAL(8) :: Fk(points), Fkd(points)
  
  SELECT CASE(DIREC)
  CASE (1) ! 正通量
-
   Fkd(1) = 0.0 ; Fkd(2) = 0.0 ; Fkd(points-1) = 0.0 ; Fkd(points) = 0.0  ! 边界处理
-
   DO i = 3, (points-2)                                                   ! 只循环计算非边界点的导数值
    JUDGE = ABS( Fk(i) - Fk(i-1) ) - ABS( Fk(i+1) - Fk(i) )               ! 每次重构前先判断i点位于波前OR波后
    IF(JUDGE < 0.0) THEN
@@ -174,9 +163,7 @@
   END DO
 
  CASE (2) ! 负通量
-
   Fkd(1) = 0.0 ; Fkd(2) = 0.0 ; Fkd(points-1) = 0.0 ; Fkd(points) = 0.0
-
   DO i = 3, (points-2)
    JUDGE = ABS( Fk(i+1) - Fk(i+2) ) - ABS( Fk(i) - Fk(i+1) )
    IF(JUDGE < 0.0) THEN
@@ -205,10 +192,8 @@
  REAL(8) dx, dt, t, w1(points+1), w2(points+1), w3(points+1)
  REAL(8) IS1, IS2, IS3, a1, a2, a3, a, x1
  INTEGER DIREC, points, scheme, i
-
  COMMON /G2/ points, scheme
  COMMON /G1/ dt, dx, t, x1
- 
  REAL(8) :: Fk(points), Fkd(points), F(points+5)
  REAL(8) :: Fk1(points), Fk2(points), Fk3(points), Fj(points+1)
 
@@ -347,10 +332,8 @@
  REAL(8) :: u(points,3), fd(points,3)
  REAL(8) dt, dx, t, x1
  INTEGER i, j, points, scheme
-
  COMMON /G1/ dt, dx, t, x1
  COMMON /G2/ points, scheme
-
  ALLOCATE(ud(points,3))
  ALLOCATE(u1(points,3))
  ALLOCATE(u2(points,3))
@@ -392,7 +375,6 @@
  IMPLICIT NONE
  REAL(8) UL, DL, PL, UR, DR, PR, dt, dx, u1, d1, p1, u2, p2, x, x1, t
  INTEGER points, i, scheme, prob
-
  COMMON /G1/ dt, dx, t, x1
  COMMON /G3/ UL, DL, PL, UR, DR, PR
  COMMON /G4/ u1, d1, p1, u2, p2
@@ -452,8 +434,8 @@
  COMMON /G2/ points, scheme
  REAL(8) ::  Q(points,3), U(points,3)
  COMMON /G1/ dt, dx, t, x1
- CALL PRIM_VARI_GET(Q, U)  ! 计算原始变量
 
+ CALL PRIM_VARI_GET(Q, U)  ! 计算原始变量
  OPEN(44,FILE='output.dat')
  x = x1
  DO i = 1, points
@@ -502,8 +484,6 @@
  END SUBROUTINE PRIM_VARI_GET
 
 
-
-
 ! 编程总结：
 ! 1、所有模块统一思考 但最好是一个模块搞定并调试完后，再写另一个模块
 ! 2、子程序数组传递时，在子程序中的变量命名时，当用到COMMON变量时，要注意声明变量的顺序
@@ -512,6 +492,6 @@
 ! 5、遇到代编号i的问题，最好先用特殊的数字1,2,3进行验证，再推广
 ! 6、运行出现“已放弃 (核心已转储)”提示可能是因为数组越界，或者F(i)=0.0，但i未指定
 ! 7、遇到未知问题时可以先编写小程序进行测试
-
-
+! 8、tecplot后处理：先打开一个dat文件，再加入第二个文件：File－Load Data File（s），选择第三个选项Add to current data set
+!    在mapping style里，delete map（所有），create map，选择第二个X-axis Var versus Y-Axis Var for All Zones
 
