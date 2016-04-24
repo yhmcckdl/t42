@@ -1,4 +1,4 @@
-! 一维欧拉方程数值解 (2016-04-22)  --by Chen Chen 
+! 一维欧拉方程有限差分法 (2016-04-22)  --by Chen Chen 
 ! 激波管问题&激波-密度扰动波干扰问题求解程序
 ! Scheme：5阶WENO，2阶GVC
 ! FVS：Steger-Warming
@@ -16,15 +16,15 @@
 
 
 !===================激波管初始条件================
- UL = 0.0   ;  DL = 1.0    ;  PL = 1.0
- UR = 0.0   ;  DR = 0.125  ;  PR = 0.1
+ UL = 0.0D0   ;  DL = 1.0D0    ;  PL = 1.0D0
+ UR = 0.0D0   ;  DR = 0.125D0  ;  PR = 0.1D0
 !============激波-密度扰动波干扰初始条件=========
- u1 = 2.629 ;  d1 = 3.857  ;  p1 = 10.333
- u2 = 0.0   ;  p2 = 1.0
+ u1 = 2.629D0 ;  d1 = 3.857D0  ;  p1 = 10.333D0
+ u2 = 0.0D0   ;  p2 = 1.0D0
 !======================计算条件===================
- time    = 0.10  ;  x1     = 0.0      ;  x2 = 1.0
- points  = 200  ;  dt     = 0.000005
- prob    = 2     ;  scheme = 2      ! scheme1 = GVC2   scheme2 = WENO5
+ time    = 0.14D0  ;  x1     = 0.0D0      ;  x2 = 1.0D0      ! prob = 1 :  x1= -0.5   x2 = 0.5   prob = 2 :  x1= 0.0   x2 = 1.0
+ points  = 200     ;  dt     = 0.0002D0
+ prob    = 1     ;  scheme = 2      ! scheme1 = GVC2   scheme2 = WENO5
  length  = x2 - x1
  dx      = length / points
  iterN   = time / dt
@@ -37,20 +37,20 @@
  CALL READ_MESH(Q)              ! 读网格
  CALL CONSER_VARI_GET(Q, U)     ! 计算守恒变量
  
- t = 0.0
+ t = 0.0D0
  DO i = 1, iterN
   CALL STEG_WARM(U, Fd)         ! Steger-Warming
   CALL RK_THREE(U, Fd)          ! 3阶Runge-Kutta
   t = t + dt
  CALL CPU_TIME(time_step)
- n = (t/time)*100.0
- WRITE(*,'(A25, F5.2, A2, A18,F8.5,A13,F6.2,A4)')'Calculation Progress : ',n,'%', '   At Time Step =', t, &
-                                                '   CPU Time = ',time_step,'sec'
+ n = (t/time)*100.0D0
+ WRITE(*,'(A25, F6.2, A2, A18,F8.5,A13,F8.2,A4)')'Calculation Progress : ',n,'%', '   At Time Step =', t, &
+                                                 '   CPU Time = ',time_step,'sec'
  END DO
 
  CALL OUTPUT(Q, U)              ! 输出文件
  CALL CPU_TIME(time_end)        ! CPU_TIME 返回本程序执行到此语句所用时间sec
- WRITE(*,'(A19,F6.2,A4)') 'Total CPU time =', time_end, 'sec'
+ WRITE(*,'(A19,F8.2,A4)') 'Total CPU time =', time_end, 'sec'
 
  END
 
@@ -81,31 +81,33 @@
   ! 原始变量
   Q(i,1)     = U(i,1)                                                     ! 密度
   Q(i,2)     = U(i,2) / U(i,1)                                            ! 速度
-  Q(i,3)     = 0.4 * ( U(i,3) - 0.5 * ( ( U(i,2) * U(i,2) ) / U(i,1) ) )  ! 压强 See Riemann book p89
-  a          = SQRT( (1.4 * Q(i,3) ) / Q(i,1) )                           ! 声速
+  Q(i,3)     = 0.4D0 * ( U(i,3) - 0.5D0 * ( ( U(i,2) * U(i,2) ) / U(i,1) ) )  ! 压强 See Riemann book p89
+  WRITE(*,*) Q(i,:)
+  STOP
+  a          = SQRT( (1.4D0 * Q(i,3) ) / Q(i,1) )                           ! 声速
   ! 3个特征值
   LAMBDA(1)  = Q(i,2)
   LAMBDA(2)  = Q(i,2) - a
   LAMBDA(3)  = Q(i,2) + a
   ! 3个正负特征值
   DO j = 1, 3
-   LAMBDA_P(j) = 0.5 * ( LAMBDA(j) + SQRT( ( LAMBDA(j) * LAMBDA(j) ) + 0.0000000001**2) )
-   LAMBDA_M(j) = 0.5 * ( LAMBDA(j) - SQRT( ( LAMBDA(j) * LAMBDA(j) ) + 0.0000000001**2) )
+   LAMBDA_P(j) = 0.5D0 * ( LAMBDA(j) + SQRT( ( LAMBDA(j) * LAMBDA(j) ) + 1D-9**2) )
+   LAMBDA_M(j) = 0.5D0 * ( LAMBDA(j) - SQRT( ( LAMBDA(j) * LAMBDA(j) ) + 1D-9**2) )
   END DO
   ! F1 的3个分量
-  F1(i,1)    = ( Q(i,1) / 2.8 ) * ( 2 * 0.4 * LAMBDA_P(1) + LAMBDA_P(2) + LAMBDA_P(3) )                   
-  F1(i,2)    = ( Q(i,1) / 2.8 ) * ( 2 * 0.4 * LAMBDA_P(1) * Q(i,2) + LAMBDA_P(2) * LAMBDA(2) + LAMBDA_P(3) * LAMBDA(3) )
-  P1         = 0.4 * LAMBDA_P(1) * Q(i,2) * Q(i,2)       ;  P2 = 0.5 * LAMBDA_P(2) * LAMBDA(2) * LAMBDA(2)
-  P3         = 0.5 * LAMBDA_P(3) * LAMBDA(3) * LAMBDA(3) ;  WP = 2.0 * ( LAMBDA_P(2) + LAMBDA_P(3) ) * a * a
+  F1(i,1)    = ( Q(i,1) / 2.8D0 ) * ( 2 * 0.4D0 * LAMBDA_P(1) + LAMBDA_P(2) + LAMBDA_P(3) )                   
+  F1(i,2)    = ( Q(i,1) / 2.8D0 ) * ( 2 * 0.4D0 * LAMBDA_P(1) * Q(i,2) + LAMBDA_P(2) * LAMBDA(2) + LAMBDA_P(3) * LAMBDA(3) )
+  P1         = 0.4D0 * LAMBDA_P(1) * Q(i,2) * Q(i,2)       ;  P2 = 0.5D0 * LAMBDA_P(2) * LAMBDA(2) * LAMBDA(2)
+  P3         = 0.5D0 * LAMBDA_P(3) * LAMBDA(3) * LAMBDA(3) ;  WP = 2.0D0 * ( LAMBDA_P(2) + LAMBDA_P(3) ) * a * a
   
-  F1(i,3)    = ( Q(i,1) / 2.8 ) * ( P1 + P2 + P3 + WP )
+  F1(i,3)    = ( Q(i,1) / 2.8D0 ) * ( P1 + P2 + P3 + WP )
   ! F2 的3个分量
-  F2(i,1)    = ( Q(i,1) / 2.8 ) * ( 2 * 0.4 * LAMBDA_M(1) + LAMBDA_M(2) + LAMBDA_M(3) )                   
-  F2(i,2)    = ( Q(i,1) / 2.8 ) * ( 2 * 0.4 * LAMBDA_M(1) * Q(i,2) + LAMBDA_M(2) * LAMBDA(2) + LAMBDA_M(3) * LAMBDA(3) )
-  M1         = 0.4 * LAMBDA_M(1) * Q(i,2) * Q(i,2)       ;  M2 = 0.5 * LAMBDA_M(2) * LAMBDA(2) * LAMBDA(2)
-  M3         = 0.5 * LAMBDA_M(3) * LAMBDA(3) * LAMBDA(3) ;  WM = 2.0 * ( LAMBDA_M(2) + LAMBDA_M(3) ) * a * a
+  F2(i,1)    = ( Q(i,1) / 2.8D0 ) * ( 2 * 0.4D0 * LAMBDA_M(1) + LAMBDA_M(2) + LAMBDA_M(3) )                   
+  F2(i,2)    = ( Q(i,1) / 2.8D0 ) * ( 2 * 0.4D0 * LAMBDA_M(1) * Q(i,2) + LAMBDA_M(2) * LAMBDA(2) + LAMBDA_M(3) * LAMBDA(3) )
+  M1         = 0.4D0 * LAMBDA_M(1) * Q(i,2) * Q(i,2)       ;  M2 = 0.5D0 * LAMBDA_M(2) * LAMBDA(2) * LAMBDA(2)
+  M3         = 0.5D0 * LAMBDA_M(3) * LAMBDA(3) * LAMBDA(3) ;  WM = 2.0D0 * ( LAMBDA_M(2) + LAMBDA_M(3) ) * a * a
   
-  F2(i,3)    = ( Q(i,1) / 2.8 ) * ( M1 + M2 + M3 + WM )
+  F2(i,3)    = ( Q(i,1) / 2.8D0 ) * ( M1 + M2 + M3 + WM )
  
  END DO
 
@@ -149,29 +151,29 @@
  
  SELECT CASE(DIREC)
  CASE (1) ! 正通量
-  Fkd(1) = 0.0 ; Fkd(2) = 0.0 ; Fkd(points-1) = 0.0 ; Fkd(points) = 0.0  ! 边界处理
+  Fkd(1) = 0.0D0 ; Fkd(2) = 0.0D0 ; Fkd(points-1) = 0.0D0 ; Fkd(points) = 0.0D0  ! 边界处理
   DO i = 3, (points-2)                                                   ! 只循环计算非边界点的导数值
    JUDGE = ABS( Fk(i) - Fk(i-1) ) - ABS( Fk(i+1) - Fk(i) )               ! 每次重构前先判断i点位于波前OR波后
-   IF(JUDGE < 0.0) THEN
-    F2 = 0.5 * ( 3.0 * Fk(i) - Fk(i-1) )
-    F1 = 0.5 * ( 3.0 * Fk(i-1) - Fk(i-2) )                               ! 先分别重构每个点的左值和右值，再计算差分
+   IF(JUDGE < 0.0D0) THEN
+    F2 = 0.5D0 * ( 3.0D0 * Fk(i) - Fk(i-1) )
+    F1 = 0.5D0 * ( 3.0D0 * Fk(i-1) - Fk(i-2) )                               ! 先分别重构每个点的左值和右值，再计算差分
    ELSE
-    F2 = 0.5 * ( Fk(i) + Fk(i+1) )
-    F1 = 0.5 * ( Fk(i-1) + Fk(i) )
+    F2 = 0.5D0 * ( Fk(i) + Fk(i+1) )
+    F1 = 0.5D0 * ( Fk(i-1) + Fk(i) )
    END IF
     Fkd(i) = ( F2 - F1 ) / dx                                            ! 守恒型格式
   END DO
 
  CASE (2) ! 负通量
-  Fkd(1) = 0.0 ; Fkd(2) = 0.0 ; Fkd(points-1) = 0.0 ; Fkd(points) = 0.0
+  Fkd(1) = 0.0D0 ; Fkd(2) = 0.0D0 ; Fkd(points-1) = 0.0D0 ; Fkd(points) = 0.0D0
   DO i = 3, (points-2)
    JUDGE = ABS( Fk(i+1) - Fk(i+2) ) - ABS( Fk(i) - Fk(i+1) )
-   IF(JUDGE < 0.0) THEN
-    F2 = 0.5 * ( 3.0 * Fk(i+1) - Fk(i+2) )
-    F1 = 0.5 * ( 3.0 * Fk(i) - Fk(i+1) )
+   IF(JUDGE < 0.0D0) THEN
+    F2 = 0.5D0 * ( 3.0D0 * Fk(i+1) - Fk(i+2) )
+    F1 = 0.5D0 * ( 3.0D0 * Fk(i) - Fk(i+1) )
    ELSE
-    F2 = 0.5 * ( Fk(i) + Fk(i+1) )
-    F1 = 0.5 * ( Fk(i-1) + Fk(i) )
+    F2 = 0.5D0 * ( Fk(i) + Fk(i+1) )
+    F1 = 0.5D0 * ( Fk(i-1) + Fk(i) )
    END IF
     Fkd(i) = ( F2 - F1 ) / dx
   END DO
@@ -197,27 +199,27 @@
  REAL(8) :: Fk(points), Fkd(points), F(points+5)
  REAL(8) :: Fk1(points), Fk2(points), Fk3(points), Fj(points+1)
 
- Fj = 0.0
+ Fj = 0.0D0
 
  SELECT CASE(DIREC)
  CASE (1) ! 正通量
   ! 构造实际计算数组F，左侧3个虚网格，右侧2个虚网格
-  F(1) = 0.0 ; F(2) = 0.0 ; F(3) = 0.0 ; F(points+4) = 0.0 ; F(points+5) = 0.0
+  F(1) = 0.0D0 ; F(2) = 0.0D0 ; F(3) = 0.0D0 ; F(points+4) = 0.0D0 ; F(points+5) = 0.0D0
 
   DO i = 1, points
    F(i+3) = Fk(i)
   END DO
 
   DO i = 1, (points+1)
-   Fk1(i) = (1.0/3.0) * F(i) - (7.0/6.0) * F(i+1) + (11.0/6.0) * F(i+2)
-   Fk2(i) = (-1.0/6.0) * F(i+1) + (5.0/6.0) * F(i+2) + (1.0/3.0) * F(i+3)
-   Fk3(i) = (1.0/3.0) * F(i+2) + (5.0/6.0) * F(i+3) - (1.0/6.0) * F(i+4)
-   IS1    = 0.25 * ( F(i) - 4.0 * F(i+1) + 3.0 * F(i+2) )**2.0 + (13.0/12.0) * ( F(i) - 2.0 * F(i+1) + F(i+2) )**2.0
-   IS2    = 0.25 * ( F(i+1) - F(i+3) )**2.0 + (13.0/12.0) * ( F(i+1) - 2.0 * F(i+2) + F(i+3) )**2.0
-   IS3    = 0.25 * ( 3.0 * F(i+2) - 4.0 * F(i+3) + F(i+4) )**2.0 + (13.0/12.0) * ( F(i+2) - 2.0 * F(i+3) + F(i+4) )**2.0
-   a1     = 0.1 / ( ( 0.000001 + IS1 )**2.0 )
-   a2     = 0.6 / ( ( 0.000001 + IS2 )**2.0 )
-   a3     = 0.3 / ( ( 0.000001 + IS3 )**2.0 )
+   Fk1(i) = (1.0D0/3.0D0) * F(i) - (7.0D0/6.0D0) * F(i+1) + (11.0D0/6.0D0) * F(i+2)
+   Fk2(i) = (-1.0D0/6.0D0) * F(i+1) + (5.0D0/6.0D0) * F(i+2) + (1.0D0/3.0D0) * F(i+3)
+   Fk3(i) = (1.0D0/3.0D0) * F(i+2) + (5.0D0/6.0D0) * F(i+3) - (1.0D0/6.0D0) * F(i+4)
+   IS1    = 0.25D0 * ( F(i) - 4.0D0 * F(i+1) + 3.0 * F(i+2) )**2.0 + (13.0/12.0D0) * ( F(i) - 2.0D0 * F(i+1) + F(i+2) )**2.0D0
+   IS2    = 0.25D0 * ( F(i+1) - F(i+3) )**2.0D0 + (13.0D0/12.0D0) * ( F(i+1) - 2.0D0 * F(i+2) + F(i+3) )**2.0D0
+   IS3    = 0.25D0 * ( 3.0D0 * F(i+2) - 4.0D0 * F(i+3) + F(i+4) )**2.0D0 + (13.0D0/12.0D0) * ( F(i+2) - 2.0D0 * F(i+3) + F(i+4) )**2.0D0
+   a1     = 0.1D0 / ( ( 1D-6 + IS1 )**2.0D0 )
+   a2     = 0.6D0 / ( ( 1D-6 + IS2 )**2.0D0 )
+   a3     = 0.3D0 / ( ( 1D-6 + IS3 )**2.0D0 )
    a      = a1 + a2 + a3
    w1(i)  = a1 / a ; w2(i) = a2 / a ; w3(i) = a3 / a
   END DO
@@ -232,14 +234,14 @@
 
   ! 边界处理
   ! j = 1            ! j = 2 
-  Fkd(1) = 0.0 ;     Fkd(2) = ( Fk3(3) - Fk3(2) ) / dx
+  Fkd(1) = 0.0D0 ;     Fkd(2) = ( Fk3(3) - Fk3(2) ) / dx
 
   ! j = 3
   DO i = 3, 4
-   IS2 = 0.25 * ( F(i+1) - F(i+3) )**2.0 + (13.0/12.0) * ( F(i+1) - 2.0 * F(i+2) + F(i+3) )**2.0
-   IS3 = 0.25 * ( 3.0 * F(i+2) - 4.0 * F(i+3) + F(i+4) )**2.0 + (13.0/12.0) * ( F(i+2) - 2.0 * F(i+3) + F(i+4) )**2.0
-   a2  = 0.6 / ( ( 0.000001 + IS2 )**2.0 )
-   a3  = 0.3 / ( ( 0.000001 + IS3 )**2.0 )
+   IS2 = 0.25D0 * ( F(i+1) - F(i+3) )**2.0D0 + (13.0D0/12.0D0) * ( F(i+1) - 2.0D0 * F(i+2) + F(i+3) )**2.0D0
+   IS3 = 0.25D0 * ( 3.0D0 * F(i+2) - 4.0D0 * F(i+3) + F(i+4) )**2.0D0 + (13.0D0/12.0D0)*( F(i+2) - 2.0D0 * F(i+3) + F(i+4) )**2.0D0
+   a2  = 0.6D0 / ( ( 1D-6 + IS2 )**2.0D0 )
+   a3  = 0.3D0 / ( ( 1D-6 + IS3 )**2.0D0 )
    a   = a2 + a3
    w2(i) = a2 / a ; w3(i) = a3 / a
   END DO
@@ -247,10 +249,10 @@
 
   ! j = points-1
   DO i = (points-1), points
-   IS1    = 0.25 * ( F(i) - 4.0 * F(i+1) + 3.0 * F(i+2) )**2.0 + (13.0/12.0) * ( F(i) - 2.0 * F(i+1) + F(i+2) )**2.0
-   IS2    = 0.25 * ( F(i+1) - F(i+3) )**2.0 + (13.0/12.0) * ( F(i+1) - 2.0 * F(i+2) + F(i+3) )**2.0
-   a1  = 0.6 / ( ( 0.000001 + IS1 )**2.0 )
-   a2  = 0.3 / ( ( 0.000001 + IS2 )**2.0 )
+   IS1    = 0.25D0 * ( F(i) - 4.0D0 * F(i+1) + 3.0D0 * F(i+2) )**2.0D0 + (13.0D0/12.0D0) * ( F(i) - 2.0D0 * F(i+1) + F(i+2) )**2.0D0
+   IS2    = 0.25D0 * ( F(i+1) - F(i+3) )**2.0D0 + (13.0D0/12.0D0) * ( F(i+1) - 2.0D0 * F(i+2) + F(i+3) )**2.0D0
+   a1  = 0.6D0 / ( ( 1D-6 + IS1 )**2.0D0 )
+   a2  = 0.3D0 / ( ( 1D-6 + IS2 )**2.0D0 )
    a   = a1 + a2
    w1(i) = a1 / a ; w2(i) = a2 / a
   END DO
@@ -260,21 +262,21 @@
   Fkd(points) = ( Fk1(points+1) - Fk1(points) ) / dx
 
  CASE (2) ! 负通量
-  F(1) = 0.0 ; F(2) = 0.0 ; F(points+3) = 0.0 ; F(points+4) = 0.0 ; F(points+5) = 0.0
+  F(1) = 0.0D0 ; F(2) = 0.0D0 ; F(points+3) = 0.0D0 ; F(points+4) = 0.0D0 ; F(points+5) = 0.0D0
   DO i = 1, points
    F(i+2) = Fk(i)
   END DO
 
   DO i = 1, points+1
-   Fk1(i) = (1.0/3.0) * F(i+4) - (7.0/6.0) * F(i+3) + (11.0/6.0) * F(i+2)
-   Fk2(i) = (-1.0/6.0) * F(i+3) + (5.0/6.0) * F(i+2) + (1.0/3.0) * F(i+1)
-   Fk3(i) = (1.0/3.0) * F(i+2) + (5.0/6.0) * F(i+1) - (1.0/6.0) * F(i) 
-   IS1    = 0.25 * ( F(i+4) - 4.0 * F(i+3) + 3.0 * F(i+2) )**2.0 + (13.0/12.0) * ( F(i+4) - 2.0 * F(i+3) + F(i+2) )**2.0
-   IS2    = 0.25 * ( F(i+3) - F(i+1) )**2.0 + (13.0/12.0) * ( F(i+3) - 2.0 * F(i+2) + F(i+1) )**2.0
-   IS3    = 0.25 * ( 3.0 * F(i+2) - 4.0 * F(i+1) + F(i) )**2.0 + (13.0/12.0) * ( F(i+2) - 2.0 * F(i+1) + F(i) )**2.0
-   a1     = 0.1 / ( ( 0.000001 + IS1 )**2.0 )
-   a2     = 0.6 / ( ( 0.000001 + IS2 )**2.0 )
-   a3     = 0.3 / ( ( 0.000001 + IS3 )**2.0 )
+   Fk1(i) = (1.0D0/3.0D0) * F(i+4) - (7.0D0/6.0D0) * F(i+3) + (11.0D0/6.0D0) * F(i+2)
+   Fk2(i) = (-1.0D0/6.0D0) * F(i+3) + (5.0D0/6.0D0) * F(i+2) + (1.0D0/3.0D0) * F(i+1)
+   Fk3(i) = (1.0D0/3.0D0) * F(i+2) + (5.0D0/6.0D0) * F(i+1) - (1.0D0/6.0D0) * F(i) 
+   IS1    = 0.25D0 * ( F(i+4) - 4.0D0 * F(i+3) + 3.0D0 * F(i+2) )**2.0D0 + (13.0D0/12.0D0) * ( F(i+4) - 2.0D0 * F(i+3) + F(i+2) )**2.0D0
+   IS2    = 0.25D0 * ( F(i+3) - F(i+1) )**2.0D0 + (13.0D0/12.0D0) * ( F(i+3) - 2.0D0 * F(i+2) + F(i+1) )**2.0D0
+   IS3    = 0.25D0 * ( 3.0D0 * F(i+2) - 4.0D0 * F(i+1) + F(i) )**2.0D0 + (13.0D0/12.0D0) * ( F(i+2) - 2.0D0 * F(i+1) + F(i) )**2.0D0
+   a1     = 0.1D0 / ( ( 1D-6 + IS1 )**2.0D0 )
+   a2     = 0.6D0 / ( ( 1D-6 + IS2 )**2.0D0 )
+   a3     = 0.3D0 / ( ( 1D-6 + IS3 )**2.0D0 )
    a      = a1 + a2 + a3
    w1(i)  = a1 / a ; w2(i) = a2 / a ; w3(i) = a3 / a
   END DO
@@ -293,24 +295,24 @@
 
   ! j = 2
   DO i = 2, 3
-   IS1    = 0.25 * ( F(i) - 4.0 * F(i+1) + 3.0 * F(i+2) )**2.0 + (13.0/12.0) * ( F(i) - 2.0 * F(i+1) + F(i+2) )**2.0
-   IS2    = 0.25 * ( F(i+1) - F(i+3) )**2.0 + (13.0/12.0) * ( F(i+1) - 2.0 * F(i+2) + F(i+3) )**2.0
-   a1  = 0.6 / ( ( 0.000001 + IS1 )**2.0 )
-   a2  = 0.3 / ( ( 0.000001 + IS2 )**2.0 )
+   IS1    = 0.25D0 * ( F(i) - 4.0D0 * F(i+1) + 3.0D0 * F(i+2) )**2.0D0 + (13.0D0/12.0D0) * ( F(i) - 2.0D0 * F(i+1) + F(i+2) )**2.0D0
+   IS2    = 0.25D0 * ( F(i+1) - F(i+3) )**2.0D0 + (13.0D0/12.0D0) * ( F(i+1) - 2.0D0 * F(i+2) + F(i+3) )**2.0D0
+   a1  = 0.6D0 / ( ( 1D-6 + IS1 )**2.0D0 )
+   a2  = 0.3D0 / ( ( 1D-6 + IS2 )**2.0D0 )
    a   = a1 + a2
    w1(i) = a1 / a ; w2(i) = a2 / a
   END DO
   Fkd(2) = ( w1(3)*Fk1(3) + w2(3)*Fk2(3) - w1(2)*Fk1(2) - w2(2)*Fk2(2) ) / dx
 
   ! j = points        ! j = points-1
-  Fkd(points) = 0.0 ; Fkd(points-1) = ( Fk3(points) - Fk3(points-1) ) / dx
+  Fkd(points) = 0.0D0 ; Fkd(points-1) = ( Fk3(points) - Fk3(points-1) ) / dx
 
   ! j = points-2
   DO i = (points-2), points-1
-   IS2 = 0.25 * ( F(i+1) - F(i+3) )**2.0 + (13.0/12.0) * ( F(i+1) - 2.0 * F(i+2) + F(i+3) )**2.0
-   IS3 = 0.25 * ( 3.0 * F(i+2) - 4.0 * F(i+3) + F(i+4) )**2.0 + (13.0/12.0) * ( F(i+2) - 2.0 * F(i+3) + F(i+4) )**2.0
-   a2  = 0.6 / ( ( 0.000001 + IS2 )**2.0 )
-   a3  = 0.3 / ( ( 0.000001 + IS3 )**2.0 )
+   IS2 = 0.25D0 * ( F(i+1) - F(i+3) )**2.0D0 + (13.0D0/12.0D0) * ( F(i+1) - 2.0D0 * F(i+2) + F(i+3) )**2.0D0
+   IS3 = 0.25D0 * ( 3.0D0 * F(i+2) - 4.0D0 * F(i+3) + F(i+4) )**2.0D0 + (13.0D0/12.0D0)*( F(i+2) - 2.0D0 * F(i+3) + F(i+4) )**2.0D0
+   a2  = 0.6D0 / ( ( 1D-6 + IS2 )**2.0D0 )
+   a3  = 0.3D0 / ( ( 1D-6 + IS3 )**2.0D0 )
    a   = a2 + a3
    w2(i) = a2 / a ; w3(i) = a3 / a
   END DO
@@ -352,7 +354,7 @@
 ! u2矩阵
  DO i = 1, 3
   DO j = 1, points
-   u2(j,i) = 0.75 * u(j,i) + 0.25 * ( u1(j,i) + dt * ( -fd(j,i) ) )
+   u2(j,i) = 0.75D0 * u(j,i) + 0.25D0 * ( u1(j,i) + dt * ( -fd(j,i) ) )
   END DO
  END DO
 
@@ -361,7 +363,7 @@
 ! 更新u矩阵
  DO i = 1, 3
   DO j = 1, points
-   u(j,i) = (1.0/3.0) * u(j,i) + (2.0/3.0) * ( u2(j,i) + dt * ( -fd(j,i) ) )
+   u(j,i) = (1.0D0/3.0D0) * u(j,i) + (2.0D0/3.0D0) * ( u2(j,i) + dt * ( -fd(j,i) ) )
   END DO
  END DO
 
@@ -392,11 +394,11 @@
   END DO
  CASE (2) ! 生成求解激波-密度扰动波干扰问题的初始网格
   DO i = 1, (points/10)
-   WRITE(66,*) d1, u1, p1
+   WRITE(66,*)  d1, u1, p1
   END DO
-  x = 0.0
-  DO i = 1, (points-points/10)
-   WRITE(66,*) 1 + 0.3*SIN(40.0*x), u2, p2
+  x = 0.1D0
+  DO i = (points/10+1), points
+   WRITE(66,*)  1 + 0.3D0*SIN(40.0D0*x), u2, p2
    x = x + dx
   END DO
  END SELECT
@@ -459,7 +461,7 @@
  DO i = 1, points
   U(i,1) = Q(i,1)
   U(i,2) = Q(i,2) * Q(i,1)
-  U(i,3) = Q(i,1) * ( 0.5 * Q(i,2) * Q(i,2) + ( Q(i,3) / ( 0.4 * Q(i,1) ) ) )
+  U(i,3) = Q(i,1) * ( 0.5D0 * Q(i,2) * Q(i,2) + ( Q(i,3) / ( 0.4D0 * Q(i,1) ) ) )
  END DO
 
  RETURN
@@ -476,7 +478,7 @@
  DO i = 1, points
   Q(i,1)     = U(i,1)                                                     ! 密度
   Q(i,2)     = U(i,2) / U(i,1)                                            ! 速度
-  Q(i,3)     = 0.4 * ( U(i,3) - 0.5 * ( ( U(i,2) * U(i,2) ) / U(i,1) ) )  ! 压强 See Riemann book p89
+  Q(i,3)     = 0.4D0 * ( U(i,3) - 0.5D0 * ( ( U(i,2) * U(i,2) ) / U(i,1) ) )  ! 压强 See Riemann book p89
 
  END DO
 
