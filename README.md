@@ -1,44 +1,20 @@
-公告
+特别注意
 ----
 
-**作者弃坑了**。
+**程序非最终版本，抄袭者后果自负**，上传本程序以及编辑本说明文档的目的主要是学习git为主。
 
-Xware Desktop
+2016年中科院计算流体力学课程大作业之二
 =============
-> 桌面化迅雷固件
+> 一维欧拉方程数值解
 
-Xware Desktop作为Xware（迅雷固件）的前端，是一次将用于嵌入式设备的迅雷软件带到Linux桌面的一次尝试。本软件与迅雷官方没有任何关系。
+本程序求解激波管问题 & 激波-密度扰动波干扰问题
 
-Xware Desktop的目标是提供与Windows平台上迅雷相当的功能。你可以这样认为：
-  - Xware Desktop是**迅雷在Linux上的原生开源方案**，无需Wine。
-  - Xware Desktop是**半官方半社区的迅雷**：下载核心使用迅雷原版[xware]，界面使用开源的代码。
+  - 时间推进：**3阶TVD型龙哥库塔法**
+  - 空间离散：**5阶WENO格式**和**2阶GVC格式**
+  - 通量技术：**Steger-Warming**
 
-使用说明：见[使用说明]。
-
-支持的发行版
-------------
-
-主条目：[发行版支持情况]，包含发行版和桌面环境的支持情况。
-
-Archlinux： 支持。安装位于`AUR`的[xware-desktop包]。
-
-Ubuntu：支持14.04及以上版本。需自行打包，见[Ubuntu上编译安装说明]。
-
-Fedora: 网友提供Fedora 19+、CentOS 7+的安装包。[Fedora/CentOS包]。
-
-其它发行版：暂无支持。需[手动安装编译]。
+理论部分见李新亮课件：[下载地址]
 
 
-许可证
-------
+[下载]:http://pan.baidu.com/s/1kTxHAjP
 
-* GPLv3 -- Xware Desktop部分
-* 迅雷协议 -- Xware部分
-
-[xware]:http://luyou.xunlei.com/forum-51-1.html
-[xware-desktop包]:https://aur.archlinux.org/packages/xware-desktop/
-[使用说明]:https://github.com/Xinkai/XwareDesktop/wiki/使用说明
-[发行版支持情况]:https://github.com/Xinkai/XwareDesktop/wiki/发行版支持情况
-[手动安装编译]:https://github.com/Xinkai/XwareDesktop/wiki/手动安装编译
-[Ubuntu上编译安装说明]:https://github.com/Xinkai/XwareDesktop/wiki/Ubuntu上编译安装说明
-[Fedora/CentOS包]:https://copr.fedoraproject.org/coprs/mosquito/myrepo/
